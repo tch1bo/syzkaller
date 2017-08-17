@@ -124,19 +124,21 @@ enum cmp_type_t {
 
 struct kcov_comparison_t {
 	// The field "type" is uint64_t, although it should be enum cmp_type_t.
-    // This is done to facilitate reading from KCOV. What we do is:
-    // kcov_comparison_t *comps = (kcov_comparison_t *) shared_memory;
-    uint64_t type;
+	// This is done to facilitate reading from KCOV. What we do is:
+	// kcov_comparison_t *comps = (kcov_comparison_t *) shared_memory;
+	uint64_t type;
 	uint64_t arg1;
 	uint64_t arg2;
 
-	bool operator==(const struct kcov_comparison_t& other) const {
+	bool operator==(const struct kcov_comparison_t& other) const
+	{
 		return ((type == other.type) &&
 			(arg1 == other.arg1) &&
 			(arg2 == other.arg2));
 	}
 
-	bool operator<(const struct kcov_comparison_t& other) const {
+	bool operator<(const struct kcov_comparison_t& other) const
+	{
 		if (type != other.type) {
 			return ((int)type < (int)other.type);
 		}
@@ -148,20 +150,21 @@ struct kcov_comparison_t {
 
 	// Writes the structure using the write_one function for each field.
 	// Inspired by write_output() function.
-	void write(uint32_t* (*write_one)(uint32_t)) {
+	void write(uint32_t* (*write_one)(uint32_t))
+	{
 		// write order: type arg1 arg2
-        bool is_size_8 = (type == KCOV_TYPE_CMP8 ||
-                type == KCOV_TYPE_SWITCH8 ||
-                type == KCOV_TYPE_CONST_CMP8);
-        bool is_const = (type > KCOV_TYPE_CMP8);
-        // Transform the type the following way:
-        //      LSB - 1 if size is 8, 0 otherwise
-        //      second LSB - 1 if one of the args is const, 0 otherwise
-        uint32_t t = 0;
-        t |= (is_size_8 << 0);
-        t |= (is_const << 1);
-        write_one(t);
-        if (!is_size_8) {
+		bool is_size_8 = (type == KCOV_TYPE_CMP8 ||
+				  type == KCOV_TYPE_SWITCH8 ||
+				  type == KCOV_TYPE_CONST_CMP8);
+		bool is_const = (type > KCOV_TYPE_CMP8);
+		// Transform the type the following way:
+		//      LSB - 1 if size is 8, 0 otherwise
+		//      second LSB - 1 if one of the args is const, 0 otherwise
+		uint32_t t = 0;
+		t |= (is_size_8 << 0);
+		t |= (is_const << 1);
+		write_one(t);
+		if (!is_size_8) {
 			write_one((uint32_t)arg1);
 			write_one((uint32_t)arg2);
 			return;
@@ -662,57 +665,57 @@ void handle_completion(thread_t* th)
 		uint32_t* comps_count_pos = write_output(0); // filled in later
 		uint32_t nsig = 0, cover_size = 0, comps_size = 0;
 
-        if (flag_collect_comps) {
+		if (flag_collect_comps) {
 			// Collect only the comparisons
 			comps_size = th->cover_size;
-            kcov_comparison_t* start = (kcov_comparison_t*) th->cover_data;
-            kcov_comparison_t* end = start + comps_size;
+			kcov_comparison_t* start = (kcov_comparison_t*)th->cover_data;
+			kcov_comparison_t* end = start + comps_size;
 			std::sort(start, end);
-            comps_size = std::unique(start, end) - start;
+			comps_size = std::unique(start, end) - start;
 			for (uint32_t i = 0; i < comps_size; ++i) {
 				start[i].write(write_output);
 			}
-        } else {
-            // Write out feedback signals.
-            // Currently it is code edges computed as xor of
-            // two subsequent basic block PCs.
-            uint32_t prev = 0;
-            for (uint32_t i = 0; i < th->cover_size; i++) {
-                uint32_t pc = (uint32_t) th->cover_data[i];
-                uint32_t sig = pc ^ prev;
-                prev = hash(pc);
-                if (dedup(sig))
-                    continue;
-                write_output(sig);
-                nsig++;
-            }
-            if (flag_collect_cover) {
-                // Write out real coverage (basic block PCs).
-                cover_size = th->cover_size;
-                if (flag_dedup_cover) {
-                    uint64_t* start = (uint64_t*)th->cover_data;
-                    uint64_t* end = start + cover_size;
-                    std::sort(start, end);
-                    cover_size = std::unique(start, end) - start;
-                }
-                // Truncate PCs to uint32_t assuming that they fit into 32-bits.
-                // True for x86_64 and arm64 without KASLR.
-                for (uint32_t i = 0; i < cover_size; i++)
-                    write_output((uint32_t)th->cover_data[i]);
-            }
-        }
-        // Write out real coverage (basic block PCs).
-        *cover_count_pos = cover_size;
-        // Write out number of comparisons
-        *comps_count_pos = comps_size;
-        // Write out number of signals
-        *signal_count_pos = nsig;
-        debug("out #%u: index=%u num=%u errno=%d sig=%u cover=%u comps=%u\n",
-                completed, th->call_index, th->call_num, reserrno, nsig,
-                cover_size, comps_size);
-        completed++;
-        __atomic_store_n(output_data, completed, __ATOMIC_RELEASE);
-    }
+		} else {
+			// Write out feedback signals.
+			// Currently it is code edges computed as xor of
+			// two subsequent basic block PCs.
+			uint32_t prev = 0;
+			for (uint32_t i = 0; i < th->cover_size; i++) {
+				uint32_t pc = (uint32_t)th->cover_data[i];
+				uint32_t sig = pc ^ prev;
+				prev = hash(pc);
+				if (dedup(sig))
+					continue;
+				write_output(sig);
+				nsig++;
+			}
+			if (flag_collect_cover) {
+				// Write out real coverage (basic block PCs).
+				cover_size = th->cover_size;
+				if (flag_dedup_cover) {
+					uint64_t* start = (uint64_t*)th->cover_data;
+					uint64_t* end = start + cover_size;
+					std::sort(start, end);
+					cover_size = std::unique(start, end) - start;
+				}
+				// Truncate PCs to uint32_t assuming that they fit into 32-bits.
+				// True for x86_64 and arm64 without KASLR.
+				for (uint32_t i = 0; i < cover_size; i++)
+					write_output((uint32_t)th->cover_data[i]);
+			}
+		}
+		// Write out real coverage (basic block PCs).
+		*cover_count_pos = cover_size;
+		// Write out number of comparisons
+		*comps_count_pos = comps_size;
+		// Write out number of signals
+		*signal_count_pos = nsig;
+		debug("out #%u: index=%u num=%u errno=%d sig=%u cover=%u comps=%u\n",
+		      completed, th->call_index, th->call_num, reserrno, nsig,
+		      cover_size, comps_size);
+		completed++;
+		__atomic_store_n(output_data, completed, __ATOMIC_RELEASE);
+	}
 	th->handled = true;
 	running--;
 }
